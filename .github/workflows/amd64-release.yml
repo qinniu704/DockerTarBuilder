@@ -40,13 +40,13 @@ jobs:
       - name: List generated files (debug step)
         run: |
           echo "Preparing docker images list (.tar.gz) files:"
-          find $GITHUB_WORKSPACE -name "*.tar.gz"
-          find $GITHUB_WORKSPACE -name "*_part_*"
+          find $GITHUB_WORKSPACE -name "*.tar.gz" -print
+          find $GITHUB_WORKSPACE -name "*_part_*" -print
           release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')
           echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v2.1.0
         with:
           tag_name: DockerTarBuilder-AMD64
           name: ${{ env.RELEASE_NAME }} for x86-64
@@ -58,14 +58,7 @@ jobs:
             [![Bilibili](https://img.shields.io/badge/Bilibili-123456?logo=bilibili&logoColor=fff&labelColor=fb7299)](https://www.bilibili.com/video/BV1yyq6YREdF)
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Docker images as release assets
-        uses: softprops/action-gh-release@v2.1.0
-        with:
-          tag_name: DockerTarBuilder-AMD64
-          files: ${{ github.workspace }}/*_part_*  # 只上传分割后的文件
-          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            ${{ github.workspace }}/**/*_part_*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
