@@ -28,10 +28,20 @@ jobs:
             rm "${image_name}-amd64.tar"
           done
 
+      - name: Split tar.gz files into parts (if larger than 2 GiB)
+        run: |
+          find $GITHUB_WORKSPACE -name "*.tar.gz" | while read file; do
+            if [ $(stat -c%s "$file") -gt 2147483648 ]; then
+              split -b 2000M "$file" "${file%.tar.gz}_part_"
+              rm "$file"
+            fi
+          done
+
       - name: List generated files (debug step)
         run: |
           echo "Preparing docker images list (.tar.gz) files:"
           find $GITHUB_WORKSPACE -name "*.tar.gz"
+          find $GITHUB_WORKSPACE -name "*_part_*"
           release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')
           echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
 
@@ -56,6 +66,7 @@ jobs:
         with:
           tag_name: DockerTarBuilder-AMD64
           files: ${{ github.workspace }}/*.tar.gz
+          files: ${{ github.workspace }}/*_part_*
           token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
