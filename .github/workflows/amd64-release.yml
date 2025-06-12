@@ -28,11 +28,11 @@ jobs:
             rm "${image_name}-amd64.tar"
           done
 
-      - name: Split tar.gz files into parts (if larger than 2 GiB)
+      - name: Split tar.gz files into parts (if larger than 1 GiB)
         run: |
           find $GITHUB_WORKSPACE -name "*.tar.gz" | while read file; do
-            if [ $(stat -c%s "$file") -gt 2147483648 ]; then
-              split -b 2000M "$file" "${file%.tar.gz}_part_"
+            if [ $(stat -c%s "$file") -gt 1073741824 ]; then
+              split -b 1000M "$file" "${file%.tar.gz}_part_"
               rm "$file"
             fi
           done
