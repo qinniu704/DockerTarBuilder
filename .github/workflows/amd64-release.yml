@@ -41,7 +41,7 @@ jobs:
             file_size=$(stat -c%s "$file")
             echo "Checking file: ${file} with size: ${file_size} bytes"
             if [ $file_size -gt 1073741824 ]; then
-              echo "File ${file} is larger than 1 GiB, splitting..."
+              echo "File ${file} is larger than 1 GiB, splitting this123..."
               split -b 1000M "$file" "${file%.tar.gz}_part_"
               echo "Removing original large file: ${file}"
               rm "$file"
