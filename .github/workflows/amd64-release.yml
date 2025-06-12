@@ -17,33 +17,51 @@ jobs:
 
       - name: Pull Docker Images and Package
         run: |
+          echo "Starting to pull Docker images and package them..."
           images="${{ github.event.inputs.docker_images }}"
           IFS=',' read -r -a image_array <<< "$images"
           for image in "${image_array[@]}"; do
+            echo "Pulling Docker image: ${image}"
             docker pull "${image}" --platform "linux/amd64"
             image_name="${image//\//_}"
             image_name="${image_name//:/_}"
+            echo "Saving Docker image: ${image} to ${image_name}-amd64.tar"
             docker save "${image}" -o "${image_name}-amd64.tar"
+            echo "Compressing ${image_name}-amd64.tar to ${image_name}-amd64.tar.gz"
             gzip -c "${image_name}-amd64.tar" > "${image_name}-amd64.tar.gz"
+            echo "Removing ${image_name}-amd64.tar"
             rm "${image_name}-amd64.tar"
           done
+          echo "Finished pulling Docker images and packaging."
 
       - name: Split tar.gz files into parts (if larger than 1 GiB)
         run: |
+          echo "Starting to split large tar.gz files..."
           find $GITHUB_WORKSPACE -name "*.tar.gz" | while read file; do
-            if [ $(stat -c%s "$file") -gt 1073741824 ]; then
+            file_size=$(stat -c%s "$file")
+            echo "Checking file: ${file} with size: ${file_size} bytes"
+            if [ $file_size -gt 1073741824 ]; then
+              echo "File ${file} is larger than 1 GiB, splitting..."
               split -b 1000M "$file" "${file%.tar.gz}_part_"
+              echo "Removing original large file: ${file}"
               rm "$file"
+            else
+              echo "File ${file} is smaller than 1 GiB, no need to split."
             fi
           done
+          echo "Finished splitting large tar.gz files."
 
       - name: List generated files (debug step)
         run: |
+          echo "Listing generated files..."
           echo "Preparing docker images list (.tar.gz) files:"
           find $GITHUB_WORKSPACE -name "*.tar.gz" -print
+          echo "Preparing docker images list (split parts) files:"
           find $GITHUB_WORKSPACE -name "*_part_*" -print
           release_name=$(TZ="Asia/Shanghai" date +'%Y-%m-%d %H:%M Build')
+          echo "Setting RELEASE_NAME to: ${release_name}"
           echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
+          echo "Finished listing generated files."
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2.1.0
@@ -58,7 +76,22 @@ jobs:
             [![Bilibili](https://img.shields.io/badge/Bilibili-123456?logo=bilibili&logoColor=fff&labelColor=fb7299)](https://www.bilibili.com/video/BV1yyq6YREdF)
           draft: false
           prerelease: false
-          files: |
-            ${{ github.workspace }}/**/*_part_*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: create_release  # 添加id以便后续步骤引用
+
+      - name: Upload Release Assets
+        run: |
+          echo "Starting to upload release assets..."
+          release_id=${{ steps.create_release.outputs.id }}  # 获取Release的ID
+          echo "Release ID: ${release_id}"
+          files_to_upload=$(find $GITHUB_WORKSPACE -name "*_part_*" -o -name "*.tar.gz" | tr '\n' ' ')
+          echo "Files to upload: ${files_to_upload}"
+          for file in $files_to_upload; do
+            echo "Uploading file: ${file}"
+            curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@${file}" \
+              "https://uploads.github.com/repos/${{ github.repository }}/releases/${release_id}/assets?name=$(basename "$file")"
+          done
+          echo "Finished uploading release assets."
